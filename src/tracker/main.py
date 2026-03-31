@@ -10,11 +10,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from .alert import check_and_alert
-from .browser_scraper import (
-    BrowserScrapeError,
-    collect_lowest_offer_via_browser,
-    collect_current_offer_via_browser
-)
 from .config import TargetConfig, load_config
 from .db import ObservationStore, RankingStore
 from .gcs_sync import download_db, upload_db
@@ -39,38 +34,12 @@ def setup_logging(verbose: bool = False) -> None:
 
 
 async def _collect_one(client: NaverShoppingSearchClient, target: TargetConfig, app_config, artifacts_dir: str) -> dict:
-    """단일 타겟 수집 및 NO_MATCH 시 자동 폴백 로직"""
-    result = None
-    
+    """단일 타겟 수집 (API 전용)"""
     if target.mode == "api_query":
         try:
-            result = collect_lowest_offer_via_api(client, app_config, target)
+            return collect_lowest_offer_via_api(client, app_config, target)
         except Exception as e:
-            # 401, 429, 네트워크 오류 등은 폴백하지 않고 예외 발생 (main 루프에서 처리)
             raise e
-
-        # API 결과가 NO_MATCH이고 fallback_url이 있는 경우에만 브라우저 폴백
-        if result.get("status") == "NO_MATCH" and target.fallback_url:
-            logger.info("API NO_MATCH -> Browser 폴백 실행 | %s", target.name)
-            fallback_target = TargetConfig(
-                name=target.name,
-                mode="browser_url",
-                url=target.fallback_url,
-                browser=target.browser,
-                match=target.match,
-            )
-            fallback_result = await collect_lowest_offer_via_browser(fallback_target, artifacts_dir)
-            # 폴백 정보 기록 루틴 (status 오염 금지)
-            fallback_result["fallback_used"] = 1
-            fallback_result["status"] = "OK"  # 폴백 성공 시에도 순수 OK 유지
-            return fallback_result
-            
-        return result
-
-    elif target.mode == "browser_url":
-        result = await collect_lowest_offer_via_browser(target, artifacts_dir)
-        return result
-
     else:
         raise ValueError(f"지원하지 않는 수집 모드: {target.mode}")
 
@@ -246,7 +215,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Naver Shopping Price Tracker")
     parser.add_argument("command", choices=["once", "monitor", "export-ui", "serve", "sync-from-gcs", "sync-to-gcs", "daily-report"], help="실행할 커맨드")
     parser.add_argument("--config", default="targets.yaml", help="설정 파일 경로")
-    parser.add_argument("--db", default="price_tracker.sqlite3", help="DB 파일 경로")
+    parser.add_argument("--db", default="smp_price_tracker.sqlite3", help="DB 파일 경로")
     parser.add_argument("--interval", type=int, default=3600, help="모니터링 주기 (초)")
     parser.add_argument("--summary-json", help="수집 결과 요약을 저장할 JSON 경로")
     parser.add_argument("--verbose", action="store_true", help="상세 로그 출력")

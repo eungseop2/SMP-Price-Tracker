@@ -18,7 +18,7 @@ app = FastAPI(title="Naver Price Tracker Cloud")
 
 # Configuration from ENV
 CONFIG_PATH = os.getenv("CONFIG_PATH", "targets.yaml")
-DB_PATH = os.getenv("DB_PATH", "data/price_tracker.sqlite3")
+DB_PATH = os.getenv("DB_PATH", "data/smp_price_tracker.sqlite3")
 ARTIFACTS_DIR = os.getenv("ARTIFACTS_DIR", "data/artifacts")
 GCS_BUCKET = os.getenv("GCS_BUCKET") # GCS 버킷 이름 (필수)
 INTERVAL = int(os.getenv("COLLECT_INTERVAL", "3600"))

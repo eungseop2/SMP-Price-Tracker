@@ -71,5 +71,5 @@ jobs:
           name: dashboard-data
           path: |
             dashboard_data.json
-            price_tracker.sqlite3
+            smp_price_tracker.sqlite3
           retention-days: 7

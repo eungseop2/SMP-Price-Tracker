@@ -13,7 +13,7 @@ def _get_client():
         logger.warning(f"GCS Client could not be initialized: {e}")
         return None
 
-def upload_db(bucket_name: str, source_file: str, dest_name: str = "price_tracker.sqlite3"):
+def upload_db(bucket_name: str, source_file: str, dest_name: str = "smp_price_tracker.sqlite3"):
     """SQLite DB를 GCS로 업로드합니다."""
     if not bucket_name:
         return
@@ -30,7 +30,7 @@ def upload_db(bucket_name: str, source_file: str, dest_name: str = "price_tracke
     except Exception as e:
         logger.error(f"GCS Upload failed: {e}")
 
-def download_db(bucket_name: str, dest_file: str, source_name: str = "price_tracker.sqlite3"):
+def download_db(bucket_name: str, dest_file: str, source_name: str = "smp_price_tracker.sqlite3"):
     """GCS에서 SQLite DB를 다운로드합니다."""
     if not bucket_name:
         return False
