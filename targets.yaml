@@ -15,6 +15,8 @@ common:
 targets:
   - name: "S26 울트라 화이트 512GB"
     mode: api_query
+    request:
+      pages: 5
     query: "갤럭시 S26 울트라 512GB"
     rank_query: "갤럭시 S26 울트라"
     category: "스마트폰"
@@ -30,6 +32,8 @@ targets:
 
   - name: "S26 울트라 코발트 바이올렛 512GB"
     mode: api_query
+    request:
+      pages: 5
     query: "갤럭시 S26 울트라 512GB"
     rank_query: "갤럭시 S26 울트라"
     category: "스마트폰"
@@ -45,6 +49,8 @@ targets:
 
   - name: "S26 울트라 스카이 블루 512GB"
     mode: api_query
+    request:
+      pages: 5
     query: "갤럭시 S26 울트라 512GB"
     rank_query: "갤럭시 S26 울트라"
     category: "스마트폰"
@@ -60,6 +66,8 @@ targets:
 
   - name: "S26 울트라 블랙 512GB"
     mode: api_query
+    request:
+      pages: 5
     query: "갤럭시 S26 울트라 512GB"
     rank_query: "갤럭시 S26 울트라"
     category: "스마트폰"

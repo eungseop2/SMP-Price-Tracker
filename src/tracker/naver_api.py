@@ -64,22 +64,27 @@ def _item_matches(target: TargetConfig, item: dict[str, Any]) -> bool:
     target_id = str(target.match.product_id or "").strip()
     product_type = int(item.get("productType", 0) or 0)
 
-    # 1. productId가 지정된 경우 ID가 일치하면 즉시 반환 (타입 체크만 병행)
-    if target_id:
-        if product_id == target_id:
-            if target.match.allowed_product_types and product_type not in target.match.allowed_product_types:
-                return False
-            return True
-        return False
-
-    # 2. product_id가 없는 경우 기존 키워드 기반 매칭 유지
+    # 1. 타입 체크 우선 (카탈로그 요청 시 카탈로그만, 혹은 사용자 지정 타입)
     if target.match.allowed_product_types and product_type not in target.match.allowed_product_types:
         return False
+
+    # 2. product_id가 지정된 경우 ID가 일치하면 최우선 매칭 (로그상 확인 가능하도록 별도 처리 가능)
+    id_matched = False
+    if target_id and product_id == target_id:
+        id_matched = True
+
+    # 3. 키워드 기반 매칭 (ID 미지정 시 필수, 지정 시 보조 수단)
+    kw_matched = True
     if target.match.required_keywords and not all_keywords_present(title, target.match.required_keywords):
-        return False
+        kw_matched = False
     if target.match.exclude_keywords and any_keyword_present(title, target.match.exclude_keywords):
-        return False
-    return True
+        kw_matched = False
+
+    # 결론: ID가 일치하거나, (ID 매칭 실패 시) 키워드라도 완벽히 맞으면 매칭 성공으로 간주
+    if id_matched:
+        return True
+    
+    return kw_matched
 
 
 

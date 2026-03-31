@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>웨어러블 가격 조사 - 최저가 트래커</title>
+    <title>S26 울트라 가격 조사 - 최저가 트래커</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -986,7 +986,7 @@
                     style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;"
                     onerror="this.style.display='none'; this.parentElement.innerText='📊'">
             </div>
-            <div class="logo-text">웨어러블 가격 조사</div>
+            <div class="logo-text">S26 울트라 가격 조사</div>
         </div>
         <div class="sidebar-toolbar">
             <label class="select-all-label">
@@ -1225,7 +1225,7 @@
 
         function renderCategoryTabs() {
             const container = document.getElementById('categoryTabs');
-            const order = ['전체', '버즈', '워치', '핏', '기타'];
+            const order = ['전체', '스마트폰', '워치', '버즈', '핏', '기타'];
             const existingCategories = new Set(dashboardData.products.map(p => p.category).filter(c => c));
             const categories = order.filter(cat => cat === '전체' || existingCategories.has(cat));
             existingCategories.forEach(cat => { if (!order.includes(cat)) categories.push(cat); });
