@@ -154,6 +154,8 @@ def collect_lowest_offer_via_api(client: NaverShoppingSearchClient, app_config: 
                 candidates.append(norm)
 
     if not candidates:
+        first_items_titles = [itm.get("title")[:30] for itm in items[:5]]
+        logger.warning(f"매칭 실패 | {target.name} | 검색된 {len(items)}개 중 조건 충족 없음. 상위 키워드 예시: {first_items_titles}")
         return {
             "target_name": target.name,
             "source_mode": target.mode,
@@ -170,8 +172,9 @@ def collect_lowest_offer_via_api(client: NaverShoppingSearchClient, app_config: 
                 "request": asdict(target.request),
                 "match": asdict(target.match),
                 "items_examined": len(items),
+                "top_5_titles": [itm.get("title") for itm in items[:5]]
             },
-            "error_message": "조건에 맞는 상품을 찾지 못했습니다. (검색된 상품 수: {})".format(len(items)),
+            "error_message": "조건에 맞는 상품을 찾지 못했습니다. (검색된 상품 수: {}, 상위 5개 제목: {})".format(len(items), first_items_titles),
         }
 
     # 정렬: 1순위 ID 매칭 상품, 2순위 최저가 순
