@@ -125,8 +125,33 @@ def collect_lowest_offer_via_api(client: NaverShoppingSearchClient, app_config: 
             itm["_search_rank"] = i
         items.extend(page_items)
 
-    candidates = [_normalized_item(item) for item in items if _item_matches(target, item)]
-    candidates = [c for c in candidates if c["price"] > 0]
+    candidates: list[dict[str, Any]] = []
+    for item in items:
+        # ID 매칭 여부와 키워드 매칭 여부를 동시에 확인
+        title = clean_text(item.get("title"))
+        product_id = str(item.get("productId", "") or "").strip()
+        target_id = str(target.match.product_id or "").strip()
+        product_type = int(item.get("productType", 0) or 0)
+
+        # 1. 타입 체크 (기본적으로 1: 카탈로그, 2: 일반, 3: 쇼핑몰상품, 11: 가격비교 등 유입 허용)
+        allowed_types = target.match.allowed_product_types or [1, 2, 3, 11]
+        type_ok = product_type in allowed_types
+
+        # 2. ID 매칭
+        id_matched = (target_id and product_id == target_id)
+
+        # 3. 키워드 매칭
+        kw_matched = True
+        if target.match.required_keywords and not all_keywords_present(title, target.match.required_keywords):
+            kw_matched = False
+        if target.match.exclude_keywords and any_keyword_present(title, target.match.exclude_keywords):
+            kw_matched = False
+
+        if type_ok and (id_matched or kw_matched):
+            norm = _normalized_item(item)
+            norm["_id_matched"] = id_matched
+            if norm["price"] > 0:
+                candidates.append(norm)
 
     if not candidates:
         return {
@@ -146,11 +171,11 @@ def collect_lowest_offer_via_api(client: NaverShoppingSearchClient, app_config: 
                 "match": asdict(target.match),
                 "items_examined": len(items),
             },
-            "error_message": "조건에 맞는 상품을 찾지 못했습니다.",
+            "error_message": "조건에 맞는 상품을 찾지 못했습니다. (검색된 상품 수: {})".format(len(items)),
         }
 
-    # 가격과 판매처 이름을 기준으로 정렬하여 최우선 상품 선택
-    best = min(candidates, key=lambda x: (x["price"], x["seller_name"] or "zzzz"))
+    # 정렬: 1순위 ID 매칭 상품, 2순위 최저가 순
+    best = min(candidates, key=lambda x: (not x["_id_matched"], x["price"], x["seller_name"] or "zzzz"))
     return {
         "target_name": target.name,
         "source_mode": target.mode,
