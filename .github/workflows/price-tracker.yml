@@ -1,0 +1,120 @@
+name: Naver Price Tracker (Automated)
+
+on:
+  schedule:
+    - cron: '21 */2 * * *'  # Every 2 hours at minute 21
+  workflow_dispatch:      # Manual trigger from GitHub UI (Refresh Now)
+  push:
+    branches: [ main ]    # Run on every push to main
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # To allow pushing updates if needed
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Run Price Tracker
+        env:
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          GCS_BUCKET: ${{ secrets.GCS_BUCKET }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          PYTHONPATH: src
+        run: |
+          # 1. Sync DB from GCS
+          python -m tracker.main sync-from-gcs || echo "First run or GCS unavailable, starting fresh"
+          
+          # 2. Collect Prices (Strict failure reporting)
+          python -m tracker.main once --summary-json summary.json
+          
+          if [ -f "summary.json" ]; then
+            echo "### 📊 Collection Summary" >> $GITHUB_STEP_SUMMARY
+            echo "```json" >> $GITHUB_STEP_SUMMARY
+            cat summary.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "```" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Export and Package UI
+        if: always() # Run even if collection partially failed
+        run: |
+          export PYTHONPATH=src
+          # 3. Export Dashboard UI
+          python -m tracker.main export-ui
+          
+          # Prepare public directory for GitHub Pages (Security: only expose UI files)
+          mkdir -p public
+          [ -f "dashboard.html" ] && cp dashboard.html public/index.html || echo "No dashboard.html found"
+          [ -f "dashboard_data.json" ] && cp dashboard_data.json public/ || echo "No dashboard_data.json found"
+          [ -f "logo.png" ] && cp logo.png public/ || echo "No logo.png found"
+
+      - name: Sync Result back to GCS
+        if: always()
+        env:
+          GCS_BUCKET: ${{ secrets.GCS_BUCKET }}
+          PYTHONPATH: src
+        run: |
+          python -m tracker.main sync-to-gcs || echo "GCS sync SKIP or FAILED"
+
+      - name: Commit and Push Changes (Data Accumulation)
+        if: always()
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add price_tracker.sqlite3 dashboard_data.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "📊 Update price history and dashboard data [skip ci]" && git push)
+
+      - name: Upload Debug Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: artifacts/
+          retention-days: 3
+
+      - name: Upload Dashboard to GitHub Pages
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './public' # Only expose the public assets
+
+  deploy:
+    needs: track
+    runs-on: ubuntu-latest
+    if: always() # 수집 실패와 무관하게 항상 업로드 시도
+    permissions:
+      pages: write
+      id-token: write
+      contents: write # 추가: 커밋을 위해 필요할 수 있음 (이미 상단에 정의됨)
+    environment:
+      name: github-pages
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,156 @@
+from __future__ import annotations
+
+import os
+from dataclasses import asdict
+from typing import Any, Iterable
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+from .config import AppConfig, TargetConfig
+from .util import all_keywords_present, any_keyword_present, clean_text, parse_int
+
+
+SHOP_API_URL = "https://openapi.naver.com/v1/search/shop.json"
+
+
+class NaverShoppingSearchClient:
+    def __init__(self, timeout_seconds: int = 20) -> None:
+        self.client_id = os.getenv("NAVER_CLIENT_ID", "")
+        self.client_secret = os.getenv("NAVER_CLIENT_SECRET", "")
+        self.user_agent = os.getenv("USER_AGENT", "NaverPriceTracker/1.0")
+        self.timeout_seconds = int(os.getenv("REQUEST_TIMEOUT", str(timeout_seconds)))
+        self.session = requests.Session()
+        retry = Retry(total=3, backoff_factor=0.5, status_forcelist=(429, 500, 502, 503, 504))
+        self.session.mount("https://", HTTPAdapter(max_retries=retry))
+
+    def _headers(self) -> dict[str, str]:
+        if not self.client_id or not self.client_secret:
+            raise RuntimeError("NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 가 설정되지 않았습니다.")
+        return {
+            "X-Naver-Client-Id": self.client_id,
+            "X-Naver-Client-Secret": self.client_secret,
+            "User-Agent": self.user_agent,
+            "Accept": "application/json",
+        }
+
+    def search(self, *, query: str, display: int = 100, start: int = 1, sort: str = "asc", filter_: str | None = None, exclude: str | None = None) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "query": query,
+            "display": display,
+            "start": start,
+            "sort": sort,
+        }
+        if filter_:
+            params["filter"] = filter_
+        if exclude:
+            params["exclude"] = exclude
+
+        response = self.session.get(
+            SHOP_API_URL,
+            headers=self._headers(),
+            params=params,
+            timeout=self.timeout_seconds,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+
+def _item_matches(target: TargetConfig, item: dict[str, Any]) -> bool:
+    title = clean_text(item.get("title"))
+    product_id = str(item.get("productId", "") or "").strip()
+    target_id = str(target.match.product_id or "").strip()
+    product_type = int(item.get("productType", 0) or 0)
+
+    # 1. productId가 지정된 경우 ID가 일치하면 즉시 반환 (타입 체크만 병행)
+    if target_id:
+        if product_id == target_id:
+            if target.match.allowed_product_types and product_type not in target.match.allowed_product_types:
+                return False
+            return True
+        return False
+
+    # 2. product_id가 없는 경우 기존 키워드 기반 매칭 유지
+    if target.match.allowed_product_types and product_type not in target.match.allowed_product_types:
+        return False
+    if target.match.required_keywords and not all_keywords_present(title, target.match.required_keywords):
+        return False
+    if target.match.exclude_keywords and any_keyword_present(title, target.match.exclude_keywords):
+        return False
+    return True
+
+
+
+def _normalized_item(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "title": clean_text(item.get("title")),
+        "price": parse_int(item.get("lprice"), default=0),
+        "seller_name": clean_text(item.get("mallName")),
+        "product_id": str(item.get("productId", "") or "") or None,
+        "product_type": int(item.get("productType", 0) or 0),
+        "product_url": item.get("link"),
+        "image_url": item.get("image"),
+        "search_rank": item.get("_search_rank"),
+        "raw_payload": item,
+    }
+
+
+
+def collect_lowest_offer_via_api(client: NaverShoppingSearchClient, app_config: AppConfig, target: TargetConfig) -> dict[str, Any]:
+    if not target.query:
+        raise ValueError(f"target '{target.name}' 에 query 가 없습니다.")
+
+    pages = max(1, target.request.pages)
+    items: list[dict[str, Any]] = []
+
+    for page_index in range(pages):
+        start = page_index * app_config.display + 1
+        payload = client.search(
+            query=target.query,
+            display=app_config.display,
+            start=start,
+            sort=target.request.sort,
+            filter_=target.request.filter,
+            exclude=app_config.exclude,
+        )
+        page_items = payload.get("items", []) or []
+        for i, itm in enumerate(page_items, start=len(items) + 1):
+            itm["_search_rank"] = i
+        items.extend(page_items)
+
+    candidates = [_normalized_item(item) for item in items if _item_matches(target, item)]
+    candidates = [c for c in candidates if c["price"] > 0]
+
+    if not candidates:
+        return {
+            "target_name": target.name,
+            "source_mode": target.mode,
+            "success": 0,
+            "status": "NO_MATCH",
+            "title": None,
+            "price": None,
+            "seller_name": None,
+            "product_id": target.match.product_id,
+            "product_type": None,
+            "product_url": None,
+            "raw_payload": {
+                "query": target.query,
+                "request": asdict(target.request),
+                "match": asdict(target.match),
+                "items_examined": len(items),
+            },
+            "error_message": "조건에 맞는 상품을 찾지 못했습니다.",
+        }
+
+    # 가격과 판매처 이름을 기준으로 정렬하여 최우선 상품 선택
+    best = min(candidates, key=lambda x: (x["price"], x["seller_name"] or "zzzz"))
+    return {
+        "target_name": target.name,
+        "source_mode": target.mode,
+        "success": 1,
+        "status": "OK",
+        **best,
+        "error_message": None,
+    }

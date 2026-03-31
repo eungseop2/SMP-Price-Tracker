@@ -1,0 +1,23 @@
+.git
+.gitignore
+.gcloudignore
+
+# Python ignore
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.env
+
+# Project specific
+data/
+price_tracker.sqlite3
+price_alerts.log
+*.bat
+scripts/
+artifacts/
+.gemini/
+*.json
+!dashboard_data.json

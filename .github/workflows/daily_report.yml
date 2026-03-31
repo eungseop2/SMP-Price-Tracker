@@ -1,0 +1,75 @@
+name: Daily Price Tracker Report
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  schedule:
+    # KST 기준 매일 오전 8시 실행 (UTC 23:00)
+    - cron: '0 23 * * *'
+  # GitHub 웹사이트에서 수동으로도 실행 가능하게 버튼 추가
+  workflow_dispatch: 
+
+jobs:
+  run-tracker-and-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 파이썬 환경 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 패키지 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Google Cloud 인증
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Cloud SDK 설정
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: GCS에서 최신 데이터 동기화 및 수집
+        env:
+          GCS_BUCKET: ${{ secrets.GCS_BUCKET }}
+        run: |
+          # 1. GCS에서 최신 DB 가져오기
+          python -m src.tracker.main sync-from-gcs || echo "GCS에서 DB를 가져오지 못했습니다. 새로 시작합니다."
+          
+          # 2. 이번 회차 데이터 수집 및 UI 갱신
+          python -m src.tracker.main once
+          python -m src.tracker.main export-ui
+
+      - name: 일단위 메일 리포트 발송
+        env:
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: |
+          python -m src.tracker.main daily-report
+
+      - name: 결과 DB 및 대시보드 GCS에 동기화
+        if: always()
+        env:
+          GCS_BUCKET: ${{ secrets.GCS_BUCKET }}
+        run: |
+          # 3. 업데이트된 DB를 GCS에 업로드
+          python -m src.tracker.main sync-to-gcs || echo "GCS 동기화 실패"
+
+      - name: 결과물(대시보드 파일) 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-data
+          path: |
+            dashboard_data.json
+            price_tracker.sqlite3
+          retention-days: 7

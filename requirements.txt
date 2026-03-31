@@ -1,0 +1,7 @@
+requests
+pyyaml
+python-dotenv
+uvicorn
+fastapi
+google-cloud-storage
+playwright

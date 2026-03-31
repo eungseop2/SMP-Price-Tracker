@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>웨어러블 가격 조사 - 최저가 트래커</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f2f4f6;
+            --sidebar-bg: #ffffff;
+            --card-bg: #ffffff;
+            --accent-primary: #3182f7;
+            --accent-secondary: #00d0ff;
+            --text-main: #191f28;
+            --text-muted: #4e5968;
+            --price-down: #3182f7;
+            /* 낮음: 파란색으로 변경 */
+            --price-up: #ef4444;
+            /* 높음: 빨간색으로 변경 */
+            --glass-border: rgba(0, 0, 0, 0.05);
+            --toss-blue: #3182f7;
+            --toss-grey: #f2f4f6;
+            --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+            --bg-soft: #f8f9fa;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Pretendard", sans-serif;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 360px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--glass-border);
+            padding: 24px 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 40px;
+            padding: 0 32px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--toss-blue);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--text-main);
+        }
+
+        .product-list {
+            list-style: none;
+            overflow-y: auto;
+            flex: 1;
+            padding: 0 16px;
+        }
+
+        .product-list::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .product-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .sidebar-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px 12px;
+            border-bottom: 1px solid var(--glass-border);
+            margin-bottom: 8px;
+        }
+
+        .select-all-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .product-checkbox,
+        #selectAllCheckbox {
+            width: 14px;
+            height: 14px;
+            accent-color: var(--accent-primary);
+            cursor: pointer;
+        }
+
+        .sidebar-footer {
+            padding: 12px 16px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        /* Category Tabs */
+        .category-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 12px 20px;
+            overflow-x: auto;
+            border-bottom: 1px solid var(--glass-border);
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .category-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .category-pill {
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: var(--toss-grey);
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .category-pill.active {
+            background: #ffffff;
+            color: var(--toss-blue);
+            border-color: var(--toss-blue);
+            box-shadow: 0 4px 12px rgba(49, 130, 247, 0.1);
+        }
+
+        .btn-excel {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: none;
+            background: var(--toss-grey);
+            color: var(--text-main);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-excel:hover {
+            background: #e5e8eb;
+            transform: translateY(-1px);
+        }
+
+        .product-item {
+            padding: 12px 16px;
+            border-radius: 20px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .product-item:hover {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .product-item.active {
+            background: #ffffff;
+            box-shadow: var(--card-shadow);
+            border-color: rgba(0, 0, 0, 0.02);
+        }
+
+        .product-thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            object-fit: contain;
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            flex-shrink: 0;
+        }
+
+        .product-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .product-name {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 3px;
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-main);
+        }
+
+        .product-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .product-price {
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--text-main);
+        }
+
+        .change-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+
+        .badge-down {
+            background: rgba(49, 130, 247, 0.08);
+            color: var(--price-down);
+        }
+
+        .badge-up {
+            background: rgba(239, 68, 68, 0.08);
+            color: var(--price-up);
+        }
+
+        .badge-none {
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--text-muted);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 48px 64px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        header {
+            margin-bottom: 48px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title h1 {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+            color: var(--text-main);
+        }
+
+        .header-subtitle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .seller-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 15px;
+            background: #ffffff;
+            padding: 8px 16px;
+            border-radius: 14px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .seller-tag {
+            color: var(--toss-blue);
+            font-weight: 800;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 24px;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s ease;
+            border: 1px solid rgba(0, 0, 0, 0.02);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-main);
+        }
+
+        .stat-diff {
+            font-size: 13px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        /* Chart Filter */
+        .chart-filters {
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-pill {
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-pill.active {
+            background: var(--accent-primary);
+            color: #fff;
+            border-color: var(--accent-primary);
+        }
+
+        .chart-badge {
+            margin-top: 16px;
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 8px;
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        /* Chart Area */
+        .chart-section {
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 28px;
+            margin-bottom: 48px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .chart-title {
+            font-weight: 700;
+            font-size: 22px;
+            color: var(--text-main);
+        }
+
+        .chart-container {
+            height: 420px;
+            position: relative;
+        }
+
+        /* History */
+        .history-section {
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 40px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .history-title {
+            font-weight: 700;
+            font-size: 22px;
+            margin-bottom: 28px;
+            color: var(--text-main);
+        }
+
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--toss-grey);
+        }
+
+        td {
+            padding: 16px;
+            font-size: 15px;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--toss-grey);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Mobile Menu Button */
+        .mobile-menu-btn {
+            display: none;
+            background: #ffffff;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            width: 44px;
+            height: 44px;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: var(--card-shadow);
+            z-index: 1001;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            z-index: 99;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* header layout */
+        .header-main-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            min-width: 0;
+            width: 100%;
+        }
+
+        .selected-image-container {
+            width: 60px;
+            height: 60px;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            flex-shrink: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .selected-image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .header-title {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .header-title h1 {
+            word-break: keep-all;
+            overflow-wrap: anywhere;
+        }
+
+        .header-subtitle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .header-btn {
+            width: auto;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .catalog-btn {
+            background: var(--toss-blue);
+            color: #ffffff;
+        }
+
+        .catalog-btn:hover {
+            background: #2b74e0;
+            transform: translateY(-1px);
+        }
+
+        /* chart */
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .chart-filters {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-pill {
+            white-space: nowrap;
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 280px;
+            }
+
+            .main-content {
+                padding: 32px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                height: auto;
+                overflow-y: auto;
+            }
+
+            /* 사이드바 전체 sticky 해제 */
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: static;
+                border-right: none;
+                border-bottom: 1px solid var(--glass-border);
+                padding: 12px 0 0;
+                box-shadow: none;
+                background: var(--bg-soft);
+            }
+
+            .sidebar-overlay {
+                display: none !important;
+            }
+
+            /* 로고는 줄이고, 선택 툴바는 숨기지 말고 compact하게 유지 */
+            .logo-container {
+                margin-bottom: 8px;
+                padding: 0 16px;
+            }
+
+            .sidebar-toolbar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 16px 10px;
+            }
+
+            /* 카테고리 탭도 가로 스크롤 유지 */
+            .category-tabs {
+                padding: 0 16px 12px;
+                margin-bottom: 8px;
+            }
+
+            /* 헤더에 같은 기능이 있으니 모바일에선 사이드바 하단 다운로드 버튼 숨김 */
+            .sidebar-footer {
+                display: none;
+            }
+
+            .product-list {
+                display: flex;
+                flex-direction: row;
+                overflow-x: auto;
+                overflow-y: hidden;
+                padding: 0 16px 12px;
+                gap: 12px;
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: x proximity;
+            }
+
+            .product-item {
+                flex: 0 0 75%;
+                min-width: 0;
+                scroll-snap-align: start;
+                margin-bottom: 0;
+                padding: 12px;
+                border-radius: 16px;
+                border: 1px solid var(--glass-border);
+            }
+
+            .main-content {
+                padding: 24px 16px;
+                height: auto;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+                margin-bottom: 28px;
+                padding-bottom: 0;
+                border-bottom: none;
+            }
+
+            .mobile-menu-btn {
+                display: none;
+                /* 상단 리스트 방식으로 바꿨으므로 메뉴 버튼 불필요 */
+            }
+
+            .header-main-row {
+                width: 100%;
+                align-items: flex-start;
+                gap: 16px;
+            }
+
+            .header-actions {
+                width: 100%;
+                gap: 8px;
+                margin-top: 0;
+            }
+
+            .header-actions>* {
+                flex: 1 1 calc(50% - 4px);
+                min-width: 0;
+            }
+
+            .stat-card {
+                padding: 20px 16px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+
+            .chart-header {
+                flex-direction: column;
+                align-items: stretch;
+                margin-bottom: 20px;
+            }
+
+            .chart-filters {
+                width: 100%;
+            }
+
+            .filter-pill {
+                flex: 1 1 calc(50% - 4px);
+                text-align: center;
+                justify-content: center;
+            }
+
+            .chart-section {
+                padding: 24px 16px;
+                border-radius: 20px;
+            }
+
+            .chart-container {
+                height: 240px;
+            }
+
+            .history-section {
+                padding: 24px 16px;
+                border-radius: 20px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            table {
+                min-width: 450px;
+            }
+
+            /* Pagination Styles */
+            .pagination {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+                margin-top: 32px;
+            }
+
+            .page-btn {
+                padding: 8px 16px;
+                border-radius: 10px;
+                border: 1px solid var(--glass-border);
+                background: #ffffff;
+                color: var(--text-main);
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .page-btn:hover:not(:disabled) {
+                background: var(--toss-grey);
+            }
+
+            .page-btn.active {
+                background: var(--toss-blue);
+                color: #ffffff;
+                border-color: var(--toss-blue);
+            }
+
+            .page-btn:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+
+            /* Date Filter Styles */
+            .date-filter-container {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                background: var(--toss-grey);
+                padding: 4px 8px;
+                border-radius: 12px;
+                margin-left: 12px;
+            }
+
+            .date-input {
+                border: none;
+                background: transparent;
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text-main);
+                outline: none;
+                cursor: pointer;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header-main-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .selected-image-container {
+                width: 56px;
+                height: 56px;
+            }
+
+            .header-title h1 {
+                font-size: 22px;
+                line-height: 1.3;
+            }
+
+            .header-actions>* {
+                flex: 1 1 100%;
+                width: 100%;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .product-item {
+                flex: 0 0 85%;
+            }
+
+            .chart-section,
+            .history-section {
+                padding: 16px;
+            }
+        }
+
+        /* ----- 신규 탭 네비게이션 ----- */
+        .view-tabs {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid var(--glass-border);
+            padding-bottom: 8px;
+        }
+
+        .view-tab {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 8px 12px;
+            position: relative;
+            transition: color 0.2s;
+        }
+
+        .view-tab:hover {
+            color: var(--text-main);
+        }
+
+        .view-tab.active {
+            color: var(--toss-blue);
+        }
+
+        .view-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--toss-blue);
+            border-radius: 3px 3px 0 0;
+        }
+
+        .view-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .view-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ----- 랭킹 테이블 UI (Stitch MCP 참고) ----- */
+        .ranking-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            border-radius: 16px;
+            background: #ffffff;
+            border: 1px solid var(--glass-border);
+            margin-bottom: 12px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .ranking-card:hover {
+            box-shadow: var(--card-shadow);
+            transform: translateY(-2px);
+        }
+        .ranking-card .rank-num {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-muted);
+            width: 40px;
+            text-align: center;
+        }
+        .ranking-card .rank-num.top1 { color: var(--accent-primary); }
+        .ranking-card .thumb {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            object-fit: contain;
+            background: var(--bg-soft);
+            padding: 4px;
+        }
+        .ranking-card-body {
+            flex: 1;
+            min-width: 0;
+        }
+        .ranking-card-body .mall {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--toss-blue);
+            margin-bottom: 4px;
+        }
+        .ranking-card-body .title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ranking-card-body .price {
+            font-size: 18px;
+            font-weight: 800;
+        }
+        .ranking-card-meta {
+            text-align: right;
+            padding-right: 16px;
+        }
+        .ranking-card-meta .pid {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: var(--toss-grey);
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+    </style>
+</head>
+
+<body>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar(false)"></div>
+    <div class="sidebar" id="sidebar">
+        <div class="logo-container" onclick="location.reload(true)" style="cursor: pointer;">
+            <div class="logo-icon" id="appLogoContainer">
+                <img src="logo.png" alt="Logo"
+                    style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;"
+                    onerror="this.style.display='none'; this.parentElement.innerText='📊'">
+            </div>
+            <div class="logo-text">웨어러블 가격 조사</div>
+        </div>
+        <div class="sidebar-toolbar">
+            <label class="select-all-label">
+                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                전체선택
+            </label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="checkedCount" style="font-size:11px;color:var(--text-muted);">0개 선택</span>
+                <select id="sortOption" onchange="renderProductList()" style="font-size:11px; border:1px solid var(--glass-border); border-radius:4px; padding:2px; color:var(--text-main); background: #ffffff; cursor: pointer; outline: none;">
+                    <option value="default">기본순</option>
+                    <option value="price_asc">가격 낮은순</option>
+                    <option value="price_desc">가격 높은순</option>
+                    <option value="name_asc">가나다순</option>
+                </select>
+            </div>
+        </div>
+        <div class="category-tabs" id="categoryTabs">
+            <!-- Category Pills -->
+        </div>
+        <ul class="product-list" id="productList">
+            <!-- Loading -->
+        </ul>
+        <div class="sidebar-footer">
+            <button class="btn-excel" onclick="downloadExcel()">📥 선택 상품 엑셀 다운로드</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <header>
+            <div class="header-main-row">
+                <div id="selectedImageContainer" class="selected-image-container">
+                    <img id="selectedImage" src="" alt="">
+                </div>
+
+                <div class="header-title">
+                    <h1 id="selectedTitle">Welcome</h1>
+                    <div class="header-subtitle">
+                        <div class="seller-info" id="sellerInfo">
+                            상품을 선택하여 분석을 시작하세요
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <span id="rankBadge" class="header-btn" style="background:#f2f4f6; color:#191f28; border:1px solid #e5e8eb; display:none;">| 네이버랭킹 -위</span>
+                <a href="#" target="_blank" class="header-btn catalog-btn" id="catalogBtn" style="display:none;">
+                    네이버 쇼핑 보기
+                </a>
+            </div>
+        </header>
+
+        <!-- 뷰 스위치 탭 -->
+        <div class="view-tabs">
+            <div class="view-tab active" onclick="switchView('priceView')" id="tabPrice">실시간 최저가 추적</div>
+            <div class="view-tab" onclick="switchView('rankingView')" id="tabRanking">키워드 Top 10 랭킹</div>
+        </div>
+
+        <!-- 최고가 추적 뷰 -->
+        <div id="priceView" class="view-content active">
+            <div class="stats-grid" id="stats-container">
+                <div class="stat-card">
+                    <div class="stat-label">현재 최저가</div>
+                    <div class="stat-value" id="currentPriceStat">-</div>
+                    <div class="stat-diff" id="currentDiff">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">역대 최저가</div>
+                    <div class="stat-value" id="allTimeLow" style="color: #ef4444;">-</div>
+                    <div class="stat-diff" id="lowDiff" style="background: rgba(239, 68, 68, 0.05); color: #ef4444;">BEST
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">역대 최고가</div>
+                    <div class="stat-value" id="allTimeHigh" style="color: var(--toss-blue);">-</div>
+                    <div class="stat-diff" id="highDiff"
+                        style="background: rgba(49, 130, 247, 0.05); color: var(--toss-blue);">PEAK</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">7일 평균</div>
+                    <div class="stat-value" id="avg7d">-</div>
+                    <div class="stat-diff" id="avg7dDiff">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">30일 평균</div>
+                    <div class="stat-value" id="avg30d">-</div>
+                    <div class="stat-diff" id="avg30dDiff">-</div>
+                </div>
+            </div>
+
+            <div class="chart-section">
+                <div class="chart-header">
+                    <div class="chart-title">가격 변동 추이</div>
+                    <div class="chart-filters">
+                        <div class="filter-pill" onclick="changeChartDays(7, this)">7일</div>
+                        <div class="filter-pill" onclick="changeChartDays(30, this)">30일</div>
+                        <div class="filter-pill active" onclick="changeChartDays(90, this)">90일</div>
+                        <div class="filter-pill" onclick="changeChartDays(0, this)">전체</div>
+                        <div class="date-filter-container">
+                            <input type="date" id="startDate" class="date-input" onchange="customDateFilter()">
+                            <span style="font-size: 12px; color: var(--text-muted);">~</span>
+                            <input type="date" id="endDate" class="date-input" onchange="customDateFilter()">
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="priceChart"></canvas>
+                </div>
+                <div id="priceBadgeContainer"></div>
+            </div>
+
+            <div class="history-section">
+                <div class="history-title">시장가 히스토리</div>
+                <div class="table-container">
+                    <table id="historyTable">
+                        <thead>
+                            <tr>
+                                <th>수집 일시</th>
+                                <th>판매 가격</th>
+                                <th>변동</th>
+                                <th>판매처</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div id="pagination" class="pagination"></div>
+            </div>
+        </div>
+
+        <!-- 랭킹 뷰 -->
+        <div id="rankingView" class="view-content">
+            <section class="history-section" style="min-height: 500px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <h2 class="history-title" style="margin-bottom: 0;">키워드 Top 10 노출 결과</h2>
+                    <span style="font-size: 13px; color: var(--text-muted);" id="rankingUpdateTime"></span>
+                </div>
+
+                <!-- 키워드 전환 탭 추가 -->
+                <div id="ranking-keyword-tabs" style="display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap;">
+                </div>
+
+                <div id="ranking-list-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        데이터를 불러오는 중이거나 이 타겟의 랭킹 기록이 없습니다.
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        let dashboardData = { products: [] };
+        let mainChart = null;
+        let selectedProductIndex = 0;
+        let selectedCategory = '전체';
+        let chartDays = 90;
+        let currentPage = 1;
+        const itemsPerPageFirst = 20;
+        const itemsPerPageNormal = 10;
+        let currentFilteredHistory = [];
+
+        function toggleSidebar(open) {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar) {
+                sidebar.classList.toggle('open', open);
+            }
+            if (overlay) {
+                overlay.classList.toggle('show', open);
+            }
+        }
+
+        async function init() {
+            console.log("Initializing dashboard...");
+            try {
+                const url = 'dashboard_data.json?v=' + encodeURIComponent(new Date().getTime());
+                console.log("Fetching data from:", url);
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Fetch failed with status: ${response.status}`);
+
+                dashboardData = await response.json();
+                console.log("Data loaded successfully:", dashboardData);
+
+                if (!dashboardData.products || dashboardData.products.length === 0) {
+                    throw new Error("No products found in data");
+                }
+
+                renderCategoryTabs();
+                renderProductList();
+
+                // 선택된 인덱스가 범위를 벗어나지 않도록 보정
+                if (selectedProductIndex >= dashboardData.products.length) {
+                    selectedProductIndex = 0;
+                }
+
+                const firstVisible = dashboardData.products.findIndex(p => selectedCategory === '전체' || p.category === selectedCategory);
+                selectProduct(firstVisible >= 0 ? firstVisible : 0);
+            } catch (e) {
+                console.error("Dashboard init failed:", e);
+                const list = document.getElementById('productList');
+                let helpMsg = "";
+                if (window.location.protocol === 'file:') {
+                    helpMsg = `<div style="margin-top:20px; padding:15px; background:#fef3c7; color:#92400e; border-radius:8px; line-height:1.6;">
+                        <strong>💡 로컬 파일 보안 정책 안내</strong><br>
+                        브라우저 보안상 파일을 바로 열면 데이터를 불러올 수 없습니다.<br>
+                        터미널에서 아래 명령어를 실행한 후 접속해주세요:<br>
+                        <code>python -m src.tracker.main serve</code><br>
+                        접속 주소: <a href="http://localhost:8000" target="_blank">http://localhost:8000</a>
+                    </div>`;
+                }
+                list.innerHTML = `<div style="padding: 20px; color: #ef4444; font-size: 13px;">
+                    ⚠️ 데이터를 불러오지 못했습니다.<br>
+                    <small>${e.message}</small><br>
+                    ${helpMsg}
+                    <button onclick="init()" style="margin-top:15px; padding:8px 16px; background:#4f46e5; color:white; border:none; border-radius:4px; cursor:pointer;">다시 시도</button>
+                </div>`;
+            }
+        }
+
+        function formatPrice(num) {
+            if (num === null || num === undefined || num === 0) return '-';
+            return new Intl.NumberFormat('ko-KR').format(num) + '원';
+        }
+
+        function toggleSelectAll(el) {
+            document.querySelectorAll('.product-checkbox').forEach(cb => cb.checked = el.checked);
+            updateCheckedCount();
+        }
+
+        function updateCheckedCount() {
+            const count = document.querySelectorAll('.product-checkbox:checked').length;
+            document.getElementById('checkedCount').textContent = count + '개 선택';
+        }
+
+        function renderCategoryTabs() {
+            const container = document.getElementById('categoryTabs');
+            const order = ['전체', '버즈', '워치', '핏', '기타'];
+            const existingCategories = new Set(dashboardData.products.map(p => p.category).filter(c => c));
+            const categories = order.filter(cat => cat === '전체' || existingCategories.has(cat));
+            existingCategories.forEach(cat => { if (!order.includes(cat)) categories.push(cat); });
+
+            container.innerHTML = categories.map(cat => `
+                <div class="category-pill ${cat === selectedCategory ? 'active' : ''}" 
+                     onclick="filterCategory('${cat}')">${cat}</div>
+            `).join('');
+        }
+
+        function filterCategory(cat) {
+            selectedCategory = cat;
+            renderCategoryTabs();
+            renderProductList();
+            const filteredIndices = dashboardData.products
+                .map((p, i) => (selectedCategory === '전체' || p.category === selectedCategory) ? i : -1)
+                .filter(i => i !== -1);
+            if (filteredIndices.length > 0) selectProduct(filteredIndices[0]);
+        }
+
+        function renderProductList() {
+            const list = document.getElementById('productList');
+            let filtered = dashboardData.products.map((p, i) => ({ ...p, originalIndex: i }))
+                .filter(p => selectedCategory === '전체' || p.category === selectedCategory);
+
+            const sortOption = document.getElementById('sortOption')?.value || 'default';
+            if (sortOption === 'price_asc') {
+                filtered.sort((a, b) => (a.current_price || 999999999) - (b.current_price || 999999999));
+            } else if (sortOption === 'price_desc') {
+                filtered.sort((a, b) => (b.current_price || 0) - (a.current_price || 0));
+            } else if (sortOption === 'name_asc') {
+                filtered.sort((a, b) => a.name.localeCompare(b.name));
+            }
+
+            const checkedIndices = Array.from(document.querySelectorAll('.product-checkbox:checked')).map(cb => parseInt(cb.dataset.index));
+
+            list.innerHTML = filtered.map((p) => {
+                const change = p.change_pct ? p.change_pct.toFixed(1) + '%' : '0.0%';
+                const badgeClass = p.status === 'PRICE_DOWN' ? 'badge-down' : (p.status === 'PRICE_UP' ? 'badge-up' : 'badge-none');
+                const trendIcon = p.status === 'PRICE_DOWN' ? '⬇️' : (p.status === 'PRICE_UP' ? '⬆️' : '➖');
+                const isChecked = checkedIndices.includes(p.originalIndex) ? 'checked' : '';
+                return `
+                    <li class="product-item ${p.originalIndex === selectedProductIndex ? 'active' : ''}" 
+                        onclick="selectProduct(${p.originalIndex})"
+                        draggable="true" 
+                        ondragstart="handleDragStart(event, ${p.originalIndex})" 
+                        ondragover="handleDragOver(event)" 
+                        ondrop="handleDrop(event, ${p.originalIndex})"
+                        ondragleave="handleDragLeave(event)"
+                        ondragend="handleDragEnd(event)">
+                        <input type="checkbox" class="product-checkbox" data-index="${p.originalIndex}" ${isChecked} onclick="event.stopPropagation(); updateCheckedCount();">
+                        <img class="product-thumb" src="${p.image_url || ''}" alt="">
+                        <div class="product-info">
+                            <span class="product-name">${p.name}</span>
+                            <div class="product-meta">
+                                <span class="product-price">${formatPrice(p.current_price)}</span>
+                                <span class="change-badge ${badgeClass}">${trendIcon} ${change}</span>
+                            </div>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+
+            updateCheckedCount();
+        }
+
+        let draggedIndex = null;
+
+        function handleDragStart(e, index) {
+            draggedIndex = index;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', index);
+            setTimeout(() => { e.target.style.opacity = '0.5'; }, 0);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const li = e.target.closest('li.product-item');
+            if (li) {
+                li.style.borderTop = '2px solid var(--toss-blue)';
+            }
+        }
+
+        function handleDragLeave(e) {
+            const li = e.target.closest('li.product-item');
+            if (li) {
+                li.style.borderTop = '1px solid transparent';
+            }
+        }
+
+        function handleDrop(e, targetIndex) {
+            e.preventDefault();
+            const li = e.target.closest('li.product-item');
+            if (li) li.style.borderTop = '1px solid transparent';
+
+            if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+            const draggedItem = dashboardData.products[draggedIndex];
+            const targetItem = dashboardData.products[targetIndex];
+
+            const selectedItem = dashboardData.products[selectedProductIndex];
+
+            dashboardData.products.splice(draggedIndex, 1);
+            let newTargetIdx = dashboardData.products.indexOf(targetItem);
+            
+            if (newTargetIdx === -1) newTargetIdx = dashboardData.products.length;
+            dashboardData.products.splice(newTargetIdx, 0, draggedItem);
+
+            if (selectedItem) {
+                selectedProductIndex = dashboardData.products.indexOf(selectedItem);
+            }
+
+            const sortSelect = document.getElementById('sortOption');
+            if (sortSelect) sortSelect.value = 'default';
+
+            renderProductList();
+        }
+
+        function handleDragEnd(e) {
+            e.target.style.opacity = '1';
+            document.querySelectorAll('li.product-item').forEach(li => li.style.borderTop = '1px solid transparent');
+            draggedIndex = null;
+        }
+
+        function selectProduct(index) {
+            selectedProductIndex = index;
+            const product = dashboardData.products[index];
+            if (!product) return;
+
+            document.querySelectorAll('.product-item').forEach(el => {
+                el.classList.toggle('active', parseInt(el.querySelector('.product-checkbox').dataset.index) === index);
+            });
+
+            document.getElementById('selectedTitle').innerText = product.name;
+            const imgEl = document.getElementById('selectedImage');
+            const imgContainer = document.getElementById('selectedImageContainer');
+            if (product.image_url) { imgEl.src = product.image_url; imgContainer.style.display = 'flex'; }
+            else { imgContainer.style.display = 'none'; }
+
+            const rankHtml = product.search_rank ? ` <span style="margin: 0 8px; color: var(--glass-border);">|</span> <span style="color:var(--toss-blue); font-weight:700;">네이버랭킹 ${product.search_rank}위</span>` : '';
+            const keywordHtml = ` <span style="margin: 0 8px; color: var(--glass-border);">|</span> <span style="font-size:12px; color:var(--text-muted);">검색키워드: "${product.rank_query || product.name}"</span>`;
+            document.getElementById('sellerInfo').innerHTML = `<span class="seller-tag">${product.seller}</span>에서 실시간 최저가 수집 중${rankHtml}${keywordHtml}`;
+            
+            // 랭킹 헤더에 키워드 표시 (그룹화된 rank_query 사용)
+            const rankingListTitle = document.querySelector('.ranking-list-title');
+            const displayKeyword = product.rank_query || product.name;
+            if (rankingListTitle) {
+                rankingListTitle.innerHTML = `검색키워드: "${displayKeyword}" <small style="font-weight:400; font-size:12px; color:var(--text-muted); margin-left:8px;">(정확도 랭킹순 상위 10개)</small>`;
+            }
+
+            renderRankingView(displayKeyword);
+
+            const catalogBtn = document.getElementById('catalogBtn');
+            if (product.product_id) { catalogBtn.href = `https://search.shopping.naver.com/catalog/${product.product_id}`; catalogBtn.style.display = 'flex'; }
+            else { catalogBtn.style.display = 'none'; }
+
+            document.getElementById('currentPriceStat').innerText = formatPrice(product.current_price);
+            document.getElementById('allTimeLow').innerText = formatPrice(product.all_time_low);
+            document.getElementById('allTimeHigh').innerText = formatPrice(product.all_time_high);
+            document.getElementById('avg7d').innerText = formatPrice(product.avg_7d);
+            document.getElementById('avg30d').innerText = formatPrice(product.avg_30d);
+
+            const setDiff = (id, current, avg) => {
+                const el = document.getElementById(id);
+                if (!avg) { el.innerText = '-'; return; }
+                const diff = current - avg;
+                const pct = ((diff / avg) * 100).toFixed(1);
+                if (diff < 0) { el.innerText = `평균대비 ${Math.abs(pct)}% 낮음 ✨`; el.style.color = 'var(--price-down)'; }
+                else if (diff > 0) { el.innerText = `평균대비 ${pct}% 높음`; el.style.color = 'var(--price-up)'; }
+                else { el.innerText = '평균가와 동일'; el.style.color = 'var(--text-muted)'; }
+            };
+            setDiff('avg7dDiff', product.current_price, product.avg_7d);
+            setDiff('avg30dDiff', product.current_price, product.avg_30d);
+            document.getElementById('currentDiff').innerText = product.status === 'PRICE_DOWN' ? '최근 하락세 감지 ✅' : (product.status === 'PRICE_UP' ? '가격 상승 중 주의 ⚠️' : '현재가 유지 중');
+
+            const badgeContainer = document.getElementById('priceBadgeContainer');
+            if (badgeContainer) {
+                if (product.current_price <= product.all_time_low && product.all_time_low > 0) {
+                    badgeContainer.innerHTML = `<div class="chart-badge" style="background: rgba(49, 130, 247, 0.1); color: #3182f7;">✨ 현재 역대 최저가 달성 중!</div>`;
+                } else {
+                    const pctFromLow = (((product.current_price - product.all_time_low) / product.all_time_low) * 100).toFixed(1);
+                    badgeContainer.innerHTML = `<div class="chart-badge">역대 최저가 대비 +${pctFromLow}% 높음</div>`;
+                }
+            }
+
+            currentPage = 1;
+            refreshChartView();
+
+            // 모바일에서 상품 선택 시 사이드바 닫기
+            if (window.innerWidth <= 768) {
+                toggleSidebar(false);
+            }
+        }
+
+        function changeChartDays(days, el) {
+            chartDays = days;
+            document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+            if (el) el.classList.add('active');
+
+            // 날짜 리셋
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+
+            currentPage = 1; // 페이지 초기화
+            refreshChartView();
+        }
+
+        function customDateFilter() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            if (start || end) {
+                chartDays = -1; // 사용자 정의 모드
+                document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+                currentPage = 1;
+                refreshChartView();
+            }
+        }
+
+        function refreshChartView() {
+            const product = dashboardData.products[selectedProductIndex];
+            let history = product.history;
+
+            const startStr = document.getElementById('startDate').value;
+            const endStr = document.getElementById('endDate').value;
+
+            if (chartDays > 0) {
+                const cutoff = new Date();
+                cutoff.setDate(cutoff.getDate() - chartDays);
+                history = history.filter(h => new Date(h.t) >= cutoff);
+            } else if (chartDays === -1) {
+                if (startStr) {
+                    const start = new Date(startStr);
+                    start.setHours(0, 0, 0, 0);
+                    history = history.filter(h => new Date(h.t) >= start);
+                }
+                if (endStr) {
+                    const end = new Date(endStr);
+                    end.setHours(23, 59, 59, 999);
+                    history = history.filter(h => new Date(h.t) <= end);
+                }
+            }
+
+            renderChart(history);
+            currentFilteredHistory = history.slice().reverse();
+            renderTable();
+            renderRankingView(product.rank_query || product.name);
+        }
+
+        function renderChart(history) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            if (mainChart) mainChart.destroy();
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(49, 130, 247, 0.15)');
+            gradient.addColorStop(1, 'rgba(49, 130, 247, 0)');
+
+            mainChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: history.map(h => { const d = new Date(h.t); return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:00`; }),
+                    datasets: [{
+                        data: history.map(h => h.p),
+                        borderColor: '#3182f7',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#3182f7',
+                        pointHoverRadius: 6,
+                        fill: true,
+                        backgroundColor: gradient,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { display: false }, y: { grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { callback: v => v.toLocaleString() } } }
+                }
+            });
+        }
+
+        function renderTable() {
+            const product = dashboardData.products[selectedProductIndex];
+            const tbody = document.querySelector('#historyTable tbody');
+            const paginationEl = document.getElementById('pagination');
+
+            const totalItems = currentFilteredHistory.length;
+
+            // 페이지네이션 계산
+            // 첫 페이지는 20개, 그 다음부터는 10개씩
+            let startIndex = 0;
+            let itemsOnThisPage = itemsPerPageNormal;
+
+            if (currentPage === 1) {
+                startIndex = 0;
+                itemsOnThisPage = itemsPerPageFirst;
+            } else {
+                startIndex = itemsPerPageFirst + (currentPage - 2) * itemsPerPageNormal;
+                itemsOnThisPage = itemsPerPageNormal;
+            }
+
+            const pageData = currentFilteredHistory.slice(startIndex, startIndex + itemsOnThisPage);
+
+            tbody.innerHTML = pageData.map((h, i) => {
+                const globalIndex = startIndex + i;
+                const date = new Date(h.t);
+                let diffStr = '-', diffColor = 'var(--text-muted)';
+
+                // 가격 변동 계산 (다음 데이터와 비교 - reverse 기준)
+                if (globalIndex < totalItems - 1) {
+                    const nextItem = currentFilteredHistory[globalIndex + 1];
+                    const diff = h.p - nextItem.p;
+                    if (diff < 0) { diffStr = `⬇️ ${Math.abs(diff).toLocaleString()}`; diffColor = 'var(--price-down)'; }
+                    else if (diff > 0) { diffStr = `⬆️ ${diff.toLocaleString()}`; diffColor = 'var(--price-up)'; }
+                    else diffStr = '0';
+                }
+
+                return `<tr><td>${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}</td><td style="font-weight:700">${formatPrice(h.p)}</td><td style="color:${diffColor};font-weight:600">${diffStr}</td><td>${product.seller}</td><td>정상</td></tr>`;
+            }).join('');
+
+            // 페이지네이션 UI 생성
+            const totalPages = totalItems <= itemsPerPageFirst ? 1 : Math.ceil((totalItems - itemsPerPageFirst) / itemsPerPageNormal) + 1;
+
+            let navHtml = `<button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>이전</button>`;
+
+            // 페이지 번호 표시 (최대 10개씩)
+            const maxPagesToShow = 10;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+            let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+            if (endPage - startPage + 1 < maxPagesToShow) {
+                startPage = Math.max(1, endPage - maxPagesToShow + 1);
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                navHtml += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+
+            navHtml += `<button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>다음</button>`;
+            paginationEl.innerHTML = navHtml;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            renderTable();
+            // 테이블 상단으로 스크롤 이동 (선택적)
+            document.querySelector('.history-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function downloadExcel() {
+            const checked = document.querySelectorAll('.product-checkbox:checked');
+            if (checked.length === 0) { alert("다운로드할 상품을 선택하세요."); return; }
+            
+            // 1. 현재 최저가 시트 데이터 준비
+            const currentData = [["상품명", "현재 최저가", "판매처", "수집시간", "네이버 랭킹", "수집 키워드"]];
+            // 2. 가격 히스토리 시트 데이터 준비 (날짜와 시간 완전 분리)
+            const historyData = [["상품명", "수집날짜", "수집시간", "가격", "판매처"]];
+            // 3. 키워드 랭킹 시트 데이터 준비
+            const rankingData = [["검색 키워드", "순위", "상품명(네이버)", "가격", "판매처", "수집시간"]];
+
+            const addedKeywords = new Set();
+
+            Array.from(checked).forEach(cb => {
+                const p = dashboardData.products[cb.dataset.index];
+                
+                // 최신 수집 시간 추출
+                let lastTime = "-";
+                if (p.history && p.history.length > 0) {
+                    const d = new Date(p.history[p.history.length - 1].t);
+                    lastTime = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                }
+
+                // 현재 정보 추가
+                currentData.push([
+                    p.name, 
+                    p.current_price, 
+                    p.seller, 
+                    lastTime,
+                    p.search_rank || "-", 
+                    p.rank_query || p.name
+                ]);
+
+                // 히스토리 정보 추가 (날짜와 시간 분리)
+                p.history.forEach(h => {
+                    const d = new Date(h.t);
+                    const formattedDate = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+                    const formattedTime = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                    historyData.push([p.name, formattedDate, formattedTime, h.p, p.seller]);
+                });
+
+                // 랭킹 정보 추가 (중복 방지)
+                const kw = p.rank_query || p.name;
+                const keywordsToProcess = [kw];
+                if (kw.includes("갤럭시")) {
+                    const short = kw.replace("갤럭시", "").trim();
+                    if (short) keywordsToProcess.push(short);
+                }
+
+                keywordsToProcess.forEach(targetK => {
+                    if (!addedKeywords.has(targetK) && dashboardData.rankings && dashboardData.rankings[targetK]) {
+                        addedKeywords.add(targetK);
+                        dashboardData.rankings[targetK].forEach(r => {
+                            const d = new Date(r.collected_at);
+                            const formattedDate = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                            rankingData.push([
+                                targetK,
+                                r.rank,
+                                r.title,
+                                r.price,
+                                r.seller_name,
+                                formattedDate
+                            ]);
+                        });
+                    }
+                });
+            });
+
+            // Workbook 생성
+            const wb = XLSX.utils.book_new();
+            
+            // 시트 1: 현재 요약
+            const wsCurrent = XLSX.utils.aoa_to_sheet(currentData);
+            XLSX.utils.book_append_sheet(wb, wsCurrent, "현재_최저가_목록");
+            
+            // 시트 2: 가격 히스토리
+            const wsHistory = XLSX.utils.aoa_to_sheet(historyData);
+            XLSX.utils.book_append_sheet(wb, wsHistory, "가격_히스토리");
+
+            // 시트 3: 키워드 랭킹
+            const wsRanking = XLSX.utils.aoa_to_sheet(rankingData);
+            XLSX.utils.book_append_sheet(wb, wsRanking, "키워드_TOP10_랭킹");
+
+            // 파일 저장
+            XLSX.writeFile(wb, `웨어러블_가격분석_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        }
+
+        /* ----- V2: 탭 전환 및 랭킹 뷰 로직 ----- */
+        function switchView(viewId) {
+            document.querySelectorAll('.view-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.view-content').forEach(content => content.classList.remove('active'));
+            
+            if(viewId === 'priceView') {
+                document.getElementById('tabPrice').classList.add('active');
+            } else {
+                document.getElementById('tabRanking').classList.add('active');
+            }
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        let currentRankingKeyword = "";
+
+        function renderRankingView(keyword) {
+            if (!keyword) return;
+            currentRankingKeyword = keyword;
+            const container = document.getElementById('ranking-list-container');
+            const tabsContainer = document.getElementById('ranking-keyword-tabs');
+            const timeEl = document.getElementById('rankingUpdateTime');
+            
+            // 키워드 목록 생성 (갤럭시 포함/제외)
+            let keywords = [keyword];
+            if (keyword.includes("갤럭시")) {
+                const short = keyword.replace("갤럭시", "").trim();
+                if (short && short !== keyword) keywords.push(short);
+            }
+
+            // 중복 제거
+            keywords = [...new Set(keywords)];
+
+            // "갤럭시"가 없는 짧은 키워드를 앞으로 정렬 (사용자 요청: 디폴트값)
+            keywords.sort((a, b) => {
+                const hasA = a.includes("갤럭시");
+                const hasB = b.includes("갤럭시");
+                if (!hasA && hasB) return -1;
+                if (hasA && !hasB) return 1;
+                return a.length - b.length;
+            });
+
+            // 탭 버튼 생성
+            tabsContainer.innerHTML = keywords.map(k => `
+                <button class="filter-pill ${k === keywords[0] ? 'active' : ''}" onclick="updateRankingData('${k}', '${keyword}')">${k}</button>
+            `).join('');
+
+            // 첫 번째 키워드(짧은 것)를 기본으로 데이터 로드
+            updateRankingData(keywords[0], keyword);
+        }
+
+        function updateRankingData(targetK, baseK) {
+            const container = document.getElementById('ranking-list-container');
+            const timeEl = document.getElementById('rankingUpdateTime');
+            
+            // 탭 활성화 상태 업데이트
+            document.querySelectorAll('#ranking-keyword-tabs .filter-pill').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText === targetK);
+            });
+
+            if (!dashboardData.rankings || !dashboardData.rankings[targetK]) {
+                container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 40px;">[${targetK}]에 대한 데이터가 아직 수집되지 않았습니다.</div>`;
+                timeEl.innerText = "";
+                return;
+            }
+
+            const rankings = dashboardData.rankings[targetK].slice(0, 10);
+            if (rankings.length > 0) {
+                const date = new Date(rankings[0].collected_at);
+                timeEl.innerText = '수집: ' + date.toLocaleString();
+            }
+
+            let html = '';
+            rankings.forEach((item) => {
+                const rank = item.rank;
+                const isTop1 = rank === 1 ? 'top1' : '';
+                const imgUrl = item.image_url || 'https://via.placeholder.com/80?text=No+Img';
+                
+                html += `
+                <div class="ranking-card" onclick="window.open('${item.product_url || '#'}', '_blank')">
+                    <div class="rank-num ${isTop1}">${rank}</div>
+                    <img class="thumb" src="${imgUrl}" alt="thumbnail"/>
+                    <div class="ranking-card-body">
+                        <div class="mall">${item.seller_name || '네이버쇼핑'}</div>
+                        <div class="title">${item.title}</div>
+                        <div class="price">${formatPrice(item.price)}</div>
+                    </div>
+                </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
