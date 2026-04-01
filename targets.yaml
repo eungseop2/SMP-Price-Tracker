@@ -22,7 +22,7 @@ targets:
       required_keywords: ["S26", "울트라", "512"]
       exclude_keywords: ["중고", "리퍼", "케이스", "필름", "강화유리", "충전기", "거치대"]
       product_id: "59045494153"
-      allowed_product_types: [1, 2, 3]
+      allowed_product_types: [1]
     request:
       pages: 3
       sort: "sim"
@@ -36,7 +36,7 @@ targets:
       required_keywords: ["S26", "울트라", "512"]
       exclude_keywords: ["중고", "리퍼", "케이스", "필름", "강화유리", "충전기", "거치대"]
       product_id: "59045494155"
-      allowed_product_types: [1, 2, 3]
+      allowed_product_types: [1]
     request:
       pages: 3
       sort: "sim"
@@ -50,7 +50,7 @@ targets:
       required_keywords: ["S26", "울트라", "512"]
       exclude_keywords: ["중고", "리퍼", "케이스", "필름", "강화유리", "충전기", "거치대"]
       product_id: "59045494154"
-      allowed_product_types: [1, 2, 3]
+      allowed_product_types: [1]
     request:
       pages: 3
       sort: "sim"
@@ -64,7 +64,7 @@ targets:
       required_keywords: ["S26", "울트라", "512"]
       exclude_keywords: ["중고", "리퍼", "케이스", "필름", "강화유리", "충전기", "거치대"]
       product_id: "59045494152"
-      allowed_product_types: [1, 2, 3]
+      allowed_product_types: [1]
     request:
       pages: 3
       sort: "sim"

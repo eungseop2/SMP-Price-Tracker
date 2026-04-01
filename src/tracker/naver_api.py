@@ -126,32 +126,45 @@ def collect_lowest_offer_via_api(client: NaverShoppingSearchClient, app_config: 
         items.extend(page_items)
 
     candidates: list[dict[str, Any]] = []
-    for item in items:
-        # ID 매칭 여부와 키워드 매칭 여부를 동시에 확인
-        title = clean_text(item.get("title"))
-        product_id = str(item.get("productId", "") or "").strip()
-        target_id = str(target.match.product_id or "").strip()
-        product_type = int(item.get("productType", 0) or 0)
+    
+    def process_items(search_items: list[dict[str, Any]], target_cfg: TargetConfig):
+        for item in search_items:
+            title = clean_text(item.get("title"))
+            product_id = str(item.get("productId", "") or "").strip()
+            target_id = str(target_cfg.match.product_id or "").strip()
+            product_type = int(item.get("productType", 0) or 0)
 
-        # 1. 타입 체크 (기본적으로 1: 카탈로그, 2: 일반, 3: 쇼핑몰상품, 11: 가격비교 등 유입 허용)
-        allowed_types = target.match.allowed_product_types or [1, 2, 3, 11]
-        type_ok = product_type in allowed_types
+            allowed_types = target_cfg.match.allowed_product_types or [1, 2, 3, 11]
+            type_ok = product_type in allowed_types
+            id_matched = (target_id and product_id == target_id)
+            kw_matched = True
+            if target_cfg.match.required_keywords and not all_keywords_present(title, target_cfg.match.required_keywords):
+                kw_matched = False
+            if target_cfg.match.exclude_keywords and any_keyword_present(title, target_cfg.match.exclude_keywords):
+                kw_matched = False
 
-        # 2. ID 매칭
-        id_matched = (target_id and product_id == target_id)
+            if type_ok and (id_matched or kw_matched):
+                norm = _normalized_item(item)
+                norm["_id_matched"] = id_matched
+                if norm["price"] > 0:
+                    candidates.append(norm)
 
-        # 3. 키워드 매칭
-        kw_matched = True
-        if target.match.required_keywords and not all_keywords_present(title, target.match.required_keywords):
-            kw_matched = False
-        if target.match.exclude_keywords and any_keyword_present(title, target.match.exclude_keywords):
-            kw_matched = False
+    # 1. 일반 검색어로 검색 및 매칭
+    process_items(items, target)
 
-        if type_ok and (id_matched or kw_matched):
-            norm = _normalized_item(item)
-            norm["_id_matched"] = id_matched
-            if norm["price"] > 0:
-                candidates.append(norm)
+    # 2. ID가 지정되었으나 매칭된 ID 상품이 없는 경우, ID 직접 검색 시도 (폴백)
+    target_id = str(target.match.product_id or "").strip()
+    has_id_candidate = any(c.get("_id_matched") for c in candidates)
+    
+    if target_id and not has_id_candidate:
+        logger.info(f"ID 직접 검색 시도 | {target.name} | ID: {target_id}")
+        try:
+            id_payload = client.search(query=target_id, display=1)
+            id_items = id_payload.get("items", []) or []
+            # ID 검색 결과에 대해서도 동일한 타입 및 키워드 검증 수행
+            process_items(id_items, target)
+        except Exception as e:
+            logger.warning(f"ID 직접 검색 실패 | {target.name} | 에러: {e}")
 
     if not candidates:
         first_items_titles = [itm.get("title")[:30] for itm in items[:5]]
