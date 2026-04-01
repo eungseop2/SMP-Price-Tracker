@@ -29,7 +29,7 @@ targets:
 
   - name: "S26 울트라 코발트 바이올렛 512GB"
     mode: api_query
-    query: "갤럭시 S26 울트라"
+    query: "갤럭시 S26 울트라 코발트 바이올렛 512GB 자급제"
     rank_query: "갤럭시 S26 울트라"
     category: "스마트폰"
     match:
@@ -43,7 +43,7 @@ targets:
 
   - name: "S26 울트라 스카이 블루 512GB"
     mode: api_query
-    query: "갤럭시 S26 울트라"
+    query: "갤럭시 S26 울트라 스카이 블루 512GB 자급제"
     rank_query: "갤럭시 S26 울트라"
     category: "스마트폰"
     match:
@@ -57,7 +57,7 @@ targets:
 
   - name: "S26 울트라 블랙 512GB"
     mode: api_query
-    query: "갤럭시 S26 울트라"
+    query: "갤럭시 S26 울트라 블랙 512GB 자급제"
     rank_query: "갤럭시 S26 울트라"
     category: "스마트폰"
     match:
