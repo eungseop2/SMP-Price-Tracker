@@ -24,7 +24,7 @@ targets:
       product_id: "59045494153"
       allowed_product_types: [1, 2, 3]
     request:
-      pages: 10
+      pages: 3
       sort: "sim"
 
   - name: "S26 울트라 코발트 바이올렛 512GB"
@@ -38,7 +38,7 @@ targets:
       product_id: "59045494155"
       allowed_product_types: [1, 2, 3]
     request:
-      pages: 10
+      pages: 3
       sort: "sim"
 
   - name: "S26 울트라 스카이 블루 512GB"
@@ -52,7 +52,7 @@ targets:
       product_id: "59045494154"
       allowed_product_types: [1, 2, 3]
     request:
-      pages: 10
+      pages: 3
       sort: "sim"
 
   - name: "S26 울트라 블랙 512GB"
@@ -66,5 +66,5 @@ targets:
       product_id: "59045494152"
       allowed_product_types: [1, 2, 3]
     request:
-      pages: 10
+      pages: 3
       sort: "sim"
